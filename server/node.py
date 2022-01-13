@@ -15,7 +15,7 @@ def receive(federated_sql: str, mode='fed'):
 #                 "group by t1.address, t2.id  order by desc t1.address limit 20;"
 federated_sql = "select t1.address, sum(t2.amount) " \
                 "from 1001.account as t1 join 1002.record as t2 on t1.u_id = t2.user_id " \
-                "where t1.age > 20 and t2._year='2021' " \
+                "where t1.age + 2 > 22 and t2._year='2021' " \
                 "group by t1.address"
 receive(federated_sql)
 

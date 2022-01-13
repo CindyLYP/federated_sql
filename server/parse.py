@@ -9,14 +9,26 @@ from sqlparse.sql import IdentifierList, Identifier, Comparison, Where, Operatio
 
 fed_token = _TokenType()
 white_space = fed_token.white_space
+float_token = fed_token.Literal.Number.Float
+int_token = fed_token.Literal.Number.Integer
 
 name_map = {}
 
 
 def get_column(frag):
-    ts = frag.tokens
-    col_name, tb_name = ts[-1].value, ts[0].value
-    column = Column(name=col_name, table_name=name_map[tb_name] if tb_name in name_map.keys() else tb_name)
+    if type(frag) == Identifier:
+        ts = frag.tokens
+        col_name, tb_name = ts[-1].value, ts[0].value
+        column = Column(name=col_name, table_name=name_map[tb_name] if tb_name in name_map.keys() else tb_name)
+    else:
+        value = frag.value
+        if "Float" in str(frag.ttype):
+            value = float(value)
+        elif "Integer" in str(frag.ttype):
+            value = int(value)
+        elif "String" in str(frag.ttype):
+            value = value.replace("\'", "").replace("\"", "")
+        column = Column(name="_UNK", table_name="_UNK", _type="const", value=value)
     return column
 
 
@@ -89,15 +101,19 @@ def parse_where_section(where_token):
 
                 columns.extend([condition.prefix_column, condition.suffix_column])
                 condition.cal_s = op_tokens[1].value
-                if condition.prefix_column.tb != condition.suffix_column.tb:
-                    condition._type = "multiply"
+
             elif type(sub_tokens[0]) == Identifier:
                 condition.prefix_column = get_column(sub_tokens[0])
                 columns.append(condition.prefix_column)
-                condition._type = "local"
 
             condition.jd_s = sub_tokens[1].value
-            condition.value = sub_tokens[2].value
+            condition.value = get_column(sub_tokens[2])
+            tmp_cols = [col.tb for col in [condition.prefix_column, condition.suffix_column, condition.value]
+                        if col is not None and col.column_type == "var"]
+            if len(set(tmp_cols)) > 1:
+                condition.condition_type = "multiply"
+            else:
+                condition.condition_type = "local"
             conditions.append(condition)
 
     res = WhereUnit(conditions=conditions, conjunctions=conjunctions, has_columns=columns)
@@ -276,7 +292,7 @@ def parse_federated_sql(raw_sql: str):
         for context in contexts:
             if context is not None and context.has_columns is not None:
                 for col in context.has_columns:
-                    if col.tb == tbn:
+                    if col.column_type != "const" and col.tb == tbn:
                         cols.append(col.name)
         cols = list(set(cols))
         context_from.tables[tbn].load_columns = cols

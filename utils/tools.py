@@ -49,4 +49,25 @@ class BaseDB:
         return result
 
 
+calculate_func = {
+    "-": lambda a, b: a - b,
+    "+": lambda a, b: a + b,
+    "*": lambda a, b: a * b,
+    "/": lambda a, b: a / b
+}
+
+compare_func = {
+    ">": lambda a, b: a > b,
+    "<": lambda a, b: a < b,
+    "=": lambda a, b: a == b,
+    ">=": lambda a, b: a >= b,
+    "<=": lambda a, b: a <= b,
+    "!=": lambda a, b: a != b,
+
+}
+conj_func = {
+    "AND": lambda a, b: a & b,
+    "OR": lambda a, b: a | b
+}
+
 dbop = BaseDB(config)

@@ -1,6 +1,7 @@
 import copy
 
 from utils.operator import *
+from utils.tools import *
 from client.node import Client
 from collections import Counter
 
@@ -17,7 +18,7 @@ def load_client(unit: FromUnit):
     return local_clients
 
 
-def psi(id4clients):
+def psi4join(id4clients):
     id4psi = copy.deepcopy(id4clients)
     public_ids = []
     for j in id4clients:
@@ -43,6 +44,25 @@ def psi(id4clients):
     return id4psi
 
 
+def psi4where(clients: dict, unit: ConditionUnit):
+    if unit.condition_type == "local":
+        tb = unit.prefix_column.tb
+        res = clients[tb].filter_by_condition(unit)
+    else:
+        prefix_tbn = unit.prefix_column.tb
+        suffix_tbn = unit.suffix_column.tb if unit.suffix_column.tb != "_UNK" else prefix_tbn
+        value_tbn = unit.value.tb if unit.value.tb != "_UNK" else prefix_tbn
+        prefix_data = clients[prefix_tbn].get_safety_data_by_column(unit.prefix_column)
+        if unit.cal_s is not None:
+            suffix_data = clients[suffix_tbn].get_safety_data_by_column(unit.suffix_column)
+            tmp = map(calculate_func[unit.cal_s], prefix_data, suffix_data)
+            prefix_data = list(tmp)
+        values = clients[value_tbn].get_safety_data_by_column(unit.value)
+        res = list(map(compare_func[unit.jd_s], prefix_data, values))
+
+    return res
+
+
 class Graph:
     def __init__(self) -> None:
         self.node_dict = {
@@ -66,12 +86,37 @@ class Graph:
                     c_id: clients[c_id].generate_join_id() for c_id in clients.keys()
                 }
                 # 隐私求交集
-                psi_ids = psi(id4clients)
+                psi_ids = psi4join(id4clients)
                 # 样本对齐
                 for c in clients.keys():
                     clients[c].align_rows(align_column=clients[c].join_column, transform=psi_ids[c], is_join=True)
             if it == "_where":
                 print()
+                federated_ids = []
+                conditions = node.conditions
+                conjunctions = node.conjunctions
+                federated_ids.append(psi4where(clients, conditions[0]))
+                for i, conj in enumerate(conjunctions):
+                    fed_id1 = psi4where(clients, conditions[i+1])
+                    if conj == "AND":
+                        fed_id2 = federated_ids.pop()
+                        new_ids = list(map(conj_func[conj], fed_id1, fed_id2))
+                        federated_ids.append(new_ids)
+                    else:
+                        federated_ids.append(fed_id1)
+                conj = "OR"
+                while len(federated_ids) > 1:
+                    fed_id1 = federated_ids.pop()
+                    fed_id2 = federated_ids.pop()
+                    new_ids = list(map(conj_func[conj], fed_id1, fed_id2))
+                    federated_ids.append(new_ids)
+                idxs = [i for i, flag in enumerate(federated_ids[0]) if flag]
+                for c in clients.keys():
+                    clients[c].filter_by_fed_ids(idxs)
+            if it == "_select":
+                pass
+
+
 
 
 

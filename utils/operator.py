@@ -1,10 +1,12 @@
 
 
 class Column:
-    def __init__(self, name, table_name, other_name=None) -> None:
+    def __init__(self, name, table_name, other_name=None, _type="var", value=None) -> None:
         self.name = name
         self.tb = table_name
         self.other_name = other_name
+        self.column_type = _type
+        self.value = value
 
 
 class Table:
@@ -60,7 +62,7 @@ class ConditionUnit:
         self.jd_s = judgment_symbol
         self.cal_s = calculation_symbol
         self.value = value
-        self._type = _type
+        self.condition_type = _type
 
 
 class GroupByUnit(BaseUnit):
