@@ -108,12 +108,13 @@ def parse_where_section(where_token):
 
             condition.jd_s = sub_tokens[1].value
             condition.value = get_column(sub_tokens[2])
+            columns.append(condition.value)
             tmp_cols = [col.tb for col in [condition.prefix_column, condition.suffix_column, condition.value]
                         if col is not None and col.column_type == "var"]
             if len(set(tmp_cols)) > 1:
-                condition.condition_type = "multiply"
+                condition.component_type = "multiply"
             else:
-                condition.condition_type = "local"
+                condition.component_type = "local"
             conditions.append(condition)
 
     res = WhereUnit(conditions=conditions, conjunctions=conjunctions, has_columns=columns)
@@ -149,8 +150,14 @@ def parse_select_section(select_token, is_dist):
             op_tokens = [t for t in s_token.tokens if not t.is_whitespace]
             unit.prefix_column = get_column(op_tokens[0])
             unit.suffix_column = get_column(op_tokens[2])
+            if unit.prefix_column.column_type == "var" and \
+                    unit.suffix_column.column_type == "var" and \
+                    unit.prefix_column.tb != unit.suffix_column.tb:
+                unit.component_type = "multiply"
+            else:
+                unit.component_type = "local"
             columns.extend([unit.prefix_column, unit.suffix_column])
-            unit.jd_s = op_tokens[1].value
+            unit.cal_s = op_tokens[1].value
 
         elif type(s_token) == Identifier:
             unit.prefix_column = get_column(s_token)
@@ -172,7 +179,10 @@ def parse_group_by_section(group_by_token):
             col = get_column(token)
             columns.append(col)
             group_columns.append(col)
+    tmp = set([col.tb for col in group_columns])
     res = GroupByUnit(columns=group_columns, has_columns=columns)
+    if len(tmp) > 1:
+        res.component_type = "multiply"
     return res
 
 

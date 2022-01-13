@@ -45,21 +45,50 @@ def psi4join(id4clients):
 
 
 def psi4where(clients: dict, unit: ConditionUnit):
-    if unit.condition_type == "local":
+    if unit.component_type == "local":
         tb = unit.prefix_column.tb
         res = clients[tb].filter_by_condition(unit)
     else:
         prefix_tbn = unit.prefix_column.tb
-        suffix_tbn = unit.suffix_column.tb if unit.suffix_column.tb != "_UNK" else prefix_tbn
+    
         value_tbn = unit.value.tb if unit.value.tb != "_UNK" else prefix_tbn
         prefix_data = clients[prefix_tbn].get_safety_data_by_column(unit.prefix_column)
         if unit.cal_s is not None:
+            suffix_tbn = unit.suffix_column.tb if unit.suffix_column.tb != "_UNK" else prefix_tbn
             suffix_data = clients[suffix_tbn].get_safety_data_by_column(unit.suffix_column)
             tmp = map(calculate_func[unit.cal_s], prefix_data, suffix_data)
             prefix_data = list(tmp)
         values = clients[value_tbn].get_safety_data_by_column(unit.value)
         res = list(map(compare_func[unit.jd_s], prefix_data, values))
 
+    return res
+
+
+def psi4group(clients: dict, columns: list):
+    c_group_ids = []
+    for column in columns:
+        tbn = column.tb
+        c_group_id = clients[tbn].get_group_ids(column)
+        c_group_ids.append(c_group_id)
+    group_len = len(c_group_ids[0])
+    group_ids = []
+    map_dict = {}
+    idx = 0
+    for i in range(group_len):
+        id_tuple = tuple([it[i] for it in c_group_ids])
+        if id_tuple not in map_dict.keys():
+            map_dict[id_tuple] = idx
+            idx += 1
+        group_ids.append([map_dict[id_tuple], id_tuple])
+
+    res = [it[0] for it in group_ids]
+    return res
+
+
+def psi4select(clients: dict, unit: ColumnUnit):
+    if unit.component_type == "local":
+        tb = unit.prefix_column.tb
+        res = clients[tb].select_by_group(unit)
     return res
 
 
@@ -113,8 +142,18 @@ class Graph:
                 idxs = [i for i, flag in enumerate(federated_ids[0]) if flag]
                 for c in clients.keys():
                     clients[c].filter_by_fed_ids(idxs)
+
+            if it == "_group_by":
+                group_by_unit = node.columns
+                clients_group_ids = psi4group(clients, group_by_unit)
+                for c in clients.keys():
+                    clients[c].load_group_ids(clients_group_ids)
+
             if it == "_select":
-                pass
+                select_units = node.columns
+                for u in select_units:
+                    psi4select(clients, u)
+
 
 
 

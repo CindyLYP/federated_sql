@@ -30,12 +30,13 @@ class SelectUnit(BaseUnit):
 
 
 class ColumnUnit:
-    def __init__(self, prefix_column=None, suffix_column=None, judgment_symbol=None, aggregation=None) -> None:
+    def __init__(self, prefix_column=None, suffix_column=None, calculation_symbol=None, aggregation=None, _type="local") -> None:
         self.prefix_column = prefix_column
         self.suffix_column = suffix_column
-        self.jd_s = judgment_symbol
+        self.cal_s = calculation_symbol
         self.agg = aggregation
         self.is_distinct = False
+        self.component_type = _type
 
 
 class FromUnit(BaseUnit):
@@ -56,19 +57,20 @@ class WhereUnit(BaseUnit):
 
 class ConditionUnit:
     def __init__(self, prefix_column=None, suffix_column=None, judgment_symbol=None, calculation_symbol=None,
-                 value=None, _type='local') -> None:
+                 value=None, _type="local") -> None:
         self.prefix_column = prefix_column
         self.suffix_column = suffix_column
         self.jd_s = judgment_symbol
         self.cal_s = calculation_symbol
         self.value = value
-        self.condition_type = _type
+        self.component_type = _type
 
 
 class GroupByUnit(BaseUnit):
-    def __init__(self, columns=None, has_columns=None) -> None:
+    def __init__(self, columns=None, has_columns=None, _type="local") -> None:
         super(GroupByUnit, self).__init__(has_columns=has_columns)
         self.columns = columns
+        self.component_type = _type
 
 
 class HavingUnit:

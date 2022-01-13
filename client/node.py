@@ -11,6 +11,7 @@ class Client:
         self.db, self.data = None, None
         self.fed_column = "fed_id"
         self.group_column = "fed_group"
+        self.group_ids = []
 
         self.load_database(client_id)
         self.load_data()
@@ -68,20 +69,6 @@ class Client:
             raise RuntimeError(f"unknown type [{column.column_type}] for column {column.tb}.{column.name}")
         return d
 
-    def filter_by_condition(self, unit: ConditionUnit):
-        # where中的条件进行本地运算
-        prefix_data = self.get_data_by_column(unit.prefix_column)
-        if unit.cal_s is not None:
-            suffix_data = self.get_data_by_column(unit.suffix_column)
-            tmp = map(calculate_func[unit.cal_s], prefix_data, suffix_data)
-            prefix_data = list(tmp)
-        values = self.get_data_by_column(unit.value)
-        res = list(map(compare_func[unit.jd_s], prefix_data, values))
-        # fed_id = self.col2id[self.fed_column]
-        #
-        # res = [(self.data[i][fed_id], tmp[i]) for i in range(len(self.data))]
-        return res
-
     def get_safety_data_by_column(self, column):
 
         # 暂用明文数据，实际考虑仅进行四则运算和比较操作可以采用同态加密等策略
@@ -98,5 +85,56 @@ class Client:
         tmp = [self.data[i] for i in idxs]
         self.data = tmp
 
-    def select_by_group(self):
-        pass
+    def filter_by_operator(self, prefix_column, suffix_column, op_s):
+        prefix_data = self.get_data_by_column(prefix_column)
+        if op_s is not None:
+            suffix_data = self.get_data_by_column(suffix_column)
+            tmp = map(calculate_func[op_s], prefix_data, suffix_data)
+            prefix_data = list(tmp)
+
+        return prefix_data
+
+    def filter_by_condition(self, unit: ConditionUnit):
+        # where中的条件进行本地运算
+        prefix_data = self.filter_by_operator(unit.prefix_column, unit.suffix_column, unit.cal_s)
+        values = self.get_data_by_column(unit.value)
+        res = list(map(compare_func[unit.jd_s], prefix_data, values))
+
+        # fed_id = self.col2id[self.fed_column]
+        # res = [(self.data[i][fed_id], tmp[i]) for i in range(len(self.data))]
+        return res
+
+    def get_group_ids(self, chosen_column: ColumnUnit):
+        g_idx = self.col2id[self.group_column]
+        col_name = chosen_column.name
+        col_idx = self.col2id[col_name]
+        group_dict = {}
+        idx = 0
+        for r in self.data:
+            it = r[col_idx]
+            if it in group_dict.keys():
+                continue
+            else:
+                group_dict[it] = idx
+                idx += 1
+        for i, r in enumerate(self.data):
+            it = r[col_idx]
+            self.data[i][g_idx] = group_dict[it]
+        res = [r[g_idx] for r in self.data]
+
+        return res
+
+    def load_group_ids(self, g_ids: list):
+        g_idx = self.col2id[self.group_column]
+        assert len(g_ids) == len(self.data), "length mismatch when update federated group by ids"
+        for i, v in enumerate(g_ids):
+            self.data[i][g_idx] = v
+
+    def select_by_group(self, unit: ColumnUnit):
+
+        prefix_data = self.filter_by_operator(unit.prefix_column, unit.suffix_column, unit.cal_s)
+        group_id = self.col2id[self.group_column]
+        fed_id = self.col2id[self.fed_column]
+        data_with_group = [(self.data[i][group_id], self.data[i][fed_id], prefix_data[i]) for i in range(len(self.data))]
+
+        return None

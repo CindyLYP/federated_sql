@@ -15,4 +15,7 @@ import pandas
 # df = pd.DataFrame(r_data, columns=columns)
 # print(df)
 
-print(True|False)
+a = {}
+b = (1,2,3)
+a[b]=1
+print(a)

@@ -70,4 +70,12 @@ conj_func = {
     "OR": lambda a, b: a | b
 }
 
+agg_func = {
+    "SUM": lambda a: sum(a),
+    "COUNT": lambda a: len(a),
+    "AVG": lambda a: sum(a) / len(a),
+    "MAX": lambda a: max(a),
+    "MIN": lambda a: min(a),
+}
+
 dbop = BaseDB(config)
