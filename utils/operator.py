@@ -30,13 +30,16 @@ class SelectUnit(BaseUnit):
 
 
 class ColumnUnit:
-    def __init__(self, prefix_column=None, suffix_column=None, calculation_symbol=None, aggregation=None, _type="local") -> None:
+    def __init__(self, prefix_column=None, suffix_column=None, calculation_symbol=None,
+                 aggregation=None, is_group=False, _type="local", unit_name=None) -> None:
         self.prefix_column = prefix_column
         self.suffix_column = suffix_column
         self.cal_s = calculation_symbol
         self.agg = aggregation
         self.is_distinct = False
+        self.is_group = is_group
         self.component_type = _type
+        self.name = unit_name
 
 
 class FromUnit(BaseUnit):

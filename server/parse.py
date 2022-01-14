@@ -137,8 +137,9 @@ def parse_select_section(select_token, is_dist):
         s_token = token
         unit = ColumnUnit()
         unit.is_distinct = is_distinct
+
         if type(s_token) == Function:
-            unit.agg = s_token.tokens[0].value
+            unit.agg = s_token.tokens[0].value.upper()
             tmp_tokens = s_token.tokens[1]
             for t in tmp_tokens.tokens:
                 if t.is_keyword and t.normalized == "DISTINCT":
@@ -217,6 +218,7 @@ def parse_federated_sql(raw_sql: str):
     global name_map
 
     text = raw_sql.replace('\n', ' ').replace(';', '')
+    print(text)
     tree = sqlparse.parse(text)
     tokens = [t for t in tree[0].tokens if not t.is_whitespace]
 
@@ -269,6 +271,12 @@ def parse_federated_sql(raw_sql: str):
                 break
 
         context_group_by = parse_group_by_section(group_by_token)
+        for col1 in context_group_by.columns:
+
+            for i, col2 in enumerate(context_select.columns):
+                if col2.agg is None and (col2.prefix_column.name == col1.name or
+                                         col2.suffix_column is not None and col2.suffix_column.name == col1.name):
+                    context_select.columns[i].agg = "HEAD"
 
     # order by
     context_order_by = None
@@ -293,7 +301,7 @@ def parse_federated_sql(raw_sql: str):
     if "LIMIT" in sql_keywords:
         for idx, token in enumerate(tokens):
             if token.is_keyword and token.normalized == "LIMIT":
-                context_limit = LimitUnit(number=tokens[idx+1].value)
+                context_limit = LimitUnit(number=int(tokens[idx+1].value))
 
     contexts = [context_from, context_where, context_group_by, context_select, context_order_by, context_limit]
 

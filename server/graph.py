@@ -38,7 +38,7 @@ def psi4join(id4clients):
     for k in id4psi.keys():
         for i, e in enumerate(id4psi[k]):
             if e in public_ids.keys():
-                id4psi[k][i] = (e, public_ids[e]//id4clients[k][e])
+                id4psi[k][i] = (e, public_ids[e] // id4clients[k][e])
             else:
                 id4psi[k][i] = (e, 0)
     return id4psi
@@ -50,7 +50,7 @@ def psi4where(clients: dict, unit: ConditionUnit):
         res = clients[tb].filter_by_condition(unit)
     else:
         prefix_tbn = unit.prefix_column.tb
-    
+
         value_tbn = unit.value.tb if unit.value.tb != "_UNK" else prefix_tbn
         prefix_data = clients[prefix_tbn].get_safety_data_by_column(unit.prefix_column)
         if unit.cal_s is not None:
@@ -68,7 +68,7 @@ def psi4group(clients: dict, columns: list):
     c_group_ids = []
     for column in columns:
         tbn = column.tb
-        c_group_id = clients[tbn].get_group_ids(column)
+        c_group_id = clients[tbn].generate_group_ids(column)
         c_group_ids.append(c_group_id)
     group_len = len(c_group_ids[0])
     group_ids = []
@@ -89,6 +89,36 @@ def psi4select(clients: dict, unit: ColumnUnit):
     if unit.component_type == "local":
         tb = unit.prefix_column.tb
         res = clients[tb].select_by_group(unit)
+    else:
+        prefix_tbn = unit.prefix_column.tb
+        suffix_tbn = unit.suffix_column.tb
+        prefix_data = clients[prefix_tbn].get_safety_data_by_column(unit.prefix_column)
+        suffix_data = clients[suffix_tbn].get_safety_data_by_column(unit.suffix_column)
+        tmp = map(calculate_func[unit.cal_s], prefix_data, suffix_data)
+        prefix_data = list(tmp)
+        group_ids, unique_ids = clients[prefix_tbn].get_group_ids()
+        data_with_group = []
+        if unit.is_distinct:
+            d = []
+            for i in range(len(prefix_data)):
+                if prefix_data[i] in d:
+                    continue
+                data_with_group.append((group_ids[i], prefix_data[i]))
+                d.append(prefix_data[i])
+        else:
+            data_with_group = [(group_ids[i], prefix_data[i]) for i in range(len(prefix_data))]
+
+        res = []
+        for group_id in unique_ids:
+            group_data = [row[1] for row in data_with_group if row[0] == group_id]
+            if unit.agg is not None:
+                group_res = agg_func[unit.agg](group_data)
+            else:
+                group_res = group_data
+            if type(group_res) != list:
+                group_res = [group_res]
+            res.append([group_id, group_res])
+
     return res
 
 
@@ -105,6 +135,7 @@ class Graph:
 
     def execute(self):
         clients = None
+        sql_result = []
         for it in self.cmd:
             node = self.node_dict[it]
             if it == "_from":
@@ -126,7 +157,7 @@ class Graph:
                 conjunctions = node.conjunctions
                 federated_ids.append(psi4where(clients, conditions[0]))
                 for i, conj in enumerate(conjunctions):
-                    fed_id1 = psi4where(clients, conditions[i+1])
+                    fed_id1 = psi4where(clients, conditions[i + 1])
                     if conj == "AND":
                         fed_id2 = federated_ids.pop()
                         new_ids = list(map(conj_func[conj], fed_id1, fed_id2))
@@ -151,16 +182,22 @@ class Graph:
 
             if it == "_select":
                 select_units = node.columns
+                select_data = []
                 for u in select_units:
-                    psi4select(clients, u)
+                    tmp = psi4select(clients, u)
+                    select_data.append(tmp)
 
+                group_len = len(select_data[0])
+                for g in range(group_len):
+                    group_data = []
+                    item_len = len(select_data[0][g][1])
+                    for i in range(item_len):
+                        row = tuple([d[g][1][i] for d in select_data])
+                        group_data.append(row)
+                    sql_result.extend(group_data)
 
+            if it == "_limit":
+                num = node.number
+                sql_result = sql_result[:num]
 
-
-
-
-
-
-
-
-
+        return sql_result

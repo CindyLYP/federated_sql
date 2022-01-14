@@ -76,6 +76,7 @@ agg_func = {
     "AVG": lambda a: sum(a) / len(a),
     "MAX": lambda a: max(a),
     "MIN": lambda a: min(a),
+    "HEAD": lambda a: a[0]
 }
 
 dbop = BaseDB(config)

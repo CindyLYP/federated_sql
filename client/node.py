@@ -11,7 +11,7 @@ class Client:
         self.db, self.data = None, None
         self.fed_column = "fed_id"
         self.group_column = "fed_group"
-        self.group_ids = []
+        self.group_ids = [0]
 
         self.load_database(client_id)
         self.load_data()
@@ -104,7 +104,7 @@ class Client:
         # res = [(self.data[i][fed_id], tmp[i]) for i in range(len(self.data))]
         return res
 
-    def get_group_ids(self, chosen_column: ColumnUnit):
+    def generate_group_ids(self, chosen_column: ColumnUnit):
         g_idx = self.col2id[self.group_column]
         col_name = chosen_column.name
         col_idx = self.col2id[col_name]
@@ -129,12 +129,37 @@ class Client:
         assert len(g_ids) == len(self.data), "length mismatch when update federated group by ids"
         for i, v in enumerate(g_ids):
             self.data[i][g_idx] = v
+        self.group_ids = list(set(g_ids))
+
+    def get_group_ids(self):
+        g_idx = self.col2id[self.group_column]
+        res = [r[g_idx] for r in self.data]
+
+        return res, self.group_ids
 
     def select_by_group(self, unit: ColumnUnit):
 
         prefix_data = self.filter_by_operator(unit.prefix_column, unit.suffix_column, unit.cal_s)
-        group_id = self.col2id[self.group_column]
-        fed_id = self.col2id[self.fed_column]
-        data_with_group = [(self.data[i][group_id], self.data[i][fed_id], prefix_data[i]) for i in range(len(self.data))]
+        g_id = self.col2id[self.group_column]
+        data_with_group = []
+        if unit.is_distinct:
+            d = []
+            for i in range(len(self.data)):
+                if prefix_data[i] in d:
+                    continue
+                data_with_group.append((self.data[i][g_id], prefix_data[i]))
+                d.append(prefix_data[i])
+        else:
+            data_with_group = [(self.data[i][g_id], prefix_data[i]) for i in range(len(self.data))]
 
-        return None
+        res = []
+        for group_id in self.group_ids:
+            group_data = [row[1] for row in data_with_group if row[0] == group_id]
+            if unit.agg is not None:
+                group_res = agg_func[unit.agg](group_data)
+            else:
+                group_res = group_data
+            if type(group_res) != list:
+                group_res = [group_res]
+            res.append([group_id, group_res])
+        return res
